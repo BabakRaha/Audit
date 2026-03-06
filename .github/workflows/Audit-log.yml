@@ -1,0 +1,47 @@
+name: Audit Log
+
+on:
+  workflow_call:
+    inputs:
+      username:
+        description: 'User who triggered the action'
+        required: true
+        type: string
+      run_url:
+        description: 'URL of the workflow run'
+        required: true
+        type: string
+      status:
+        description: 'Status of the workflow run'
+        required: true
+        type: string
+      workflow_name:
+        description: 'Name of the workflow'
+        required: true
+        type: string
+      repo_source:
+        description: 'Source repository (e.g., agent, actions)'
+        required: true
+        type: string
+    secrets:
+      PAT_TOKEN:
+        description: 'GitHub Personal Access Token'
+        required: true
+
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'User who triggered the action'
+        required: true
+      run_url:
+        description: 'URL of the workflow run'
+        required: true
+      status:
+        description: 'Status of the workflow run'
+        required: true
+      workflow_name:
+        description: 'Name of the workflow'
+        required: true
+      repo_source:
+        description: 'Source repository (e.g., agent, actions)'
+        required: true
