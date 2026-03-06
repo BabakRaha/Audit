@@ -23,6 +23,11 @@ on:
         description: 'Source repository (e.g., agent, actions)'
         required: true
         type: string
+      audit_repository:
+        description: 'Repository to log'
+        required: true
+        type: string
+      
     secrets:
       PAT_TOKEN:
         description: 'GitHub Personal Access Token'
@@ -45,3 +50,78 @@ on:
       repo_source:
         description: 'Source repository (e.g., agent, actions)'
         required: true
+      audit_repository:
+        description: 'Repository to log'
+        required: true
+        
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Audit Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.audit_repository || github.event.inputs.audit_repository }}
+          token: ${{ secrets.PAT_TOKEN || github.token }}
+        
+      - name: Append to Audit Log
+        shell: python
+        run: |
+          import json
+          import os
+          import sys
+          from datetime import datetime
+
+          # Helper to get inputs safely from both triggers
+          username = "${{ inputs.username || github.event.inputs.username }}"
+          run_url = "${{ inputs.run_url || github.event.inputs.run_url }}"
+          status = "${{ inputs.status || github.event.inputs.status }}"
+          workflow_name = "${{ inputs.workflow_name || github.event.inputs.workflow_name }}"
+          repo_source = "${{ inputs.repo_source || github.event.inputs.repo_source }}"
+          
+          if not all([username, run_url, status, workflow_name, repo_source]):
+              print("Error: Missing required inputs")
+              sys.exit(1)
+
+          filename = f"{repo_source}.json"
+          
+          # Create log entry
+          entry = {
+              "workflow_name": workflow_name,
+              "username": username,
+              "run_url": run_url,
+              "status": status,
+              "timestamp": datetime.now().isoformat() + "Z"
+          }
+          
+          # Load existing logs or create new list
+          logs = []
+          if os.path.exists(filename):
+              try:
+                  with open(filename, 'r') as f:
+                      logs = json.load(f)
+              except Exception:
+                  logs = []
+          
+          # Append new entry at the beginning
+          logs.insert(0, entry)
+          
+          # Save back to file
+          with open(filename, 'w') as f:
+              json.dump(logs, f, indent=4)
+              
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add *.json
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git commit -m "chore: update audit log for ${{ inputs.repo_source || github.event.inputs.repo_source }} [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi
